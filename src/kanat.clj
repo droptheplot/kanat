@@ -2,15 +2,16 @@
   (:require [integrant.core :as integrant]
             [ring.adapter.jetty :as jetty]
             [hikari-cp.core :as hikari-cp]
+            [migratus.core :as migratus]
             [honeysql.core :as sql]
             [clojure.java.jdbc :as db]))
 
-(def query {:select [:id]
+(def query {:select [:name]
             :from [:foo]
-            :where [:= :foo.id 2]})
+            :where [:= :id 2]})
 
 (defn handler [db-connection request]
-  (let [a (->> query sql/format (db/query db-connection) first :id)]
+  (let [a (->> query sql/format (db/query db-connection) first :name)]
     {:status 200
      :headers {"Content-Type" "text/html"}
      :body (str "Hello, " a)}))
@@ -39,7 +40,9 @@
 
 (defmethod integrant/init-key :db/connection
   [_ {:keys [db-pool]}]
-  {:datasource db-pool})
+  (let [connection {:datasource db-pool}]
+    (migratus/migrate {:migration-dir "migrations/" :store :database :db connection})
+    connection))
 
 
 (defmethod integrant/init-key :http/server
@@ -55,10 +58,10 @@
   (partial handler db-connection))
 
 
-;; (def system
-;;   (integrant/init config))
+(def system
+  (integrant/init config))
 
-;; (integrant/halt! system)
+(integrant/halt! system)
 
 (defn -main []
   (println "Started"))
